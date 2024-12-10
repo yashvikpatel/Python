@@ -1,0 +1,130 @@
+//Model.py
+from django.db import models
+
+class Student(models.Model):
+    name = models.CharField(max_length=100)
+    email = models.EmailField(unique=True)
+    age = models.IntegerField()
+    course = models.CharField(max_length=100)
+    registration_date = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+//Forms.py
+from django import forms
+from .models import Student
+
+class StudentForm(forms.ModelForm):
+    class Meta:
+        model = Student
+        fields = ['name', 'email', 'age', 'course']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'age': forms.NumberInput(attrs={'class': 'form-control'}),
+            'course': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
+//Views.py
+from django.shortcuts import render, redirect, get_object_or_404
+from .models import Student
+from .forms import StudentForm
+
+def student_list(request):
+    students = Student.objects.all()
+    return render(request, 'student_list.html', {'students': students})
+
+def student_register(request):
+    if request.method == 'POST':
+        form = StudentForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('student_list')
+    else:
+        form = StudentForm()
+    return render(request, 'student_form.html', {'form': form})
+
+def student_update(request, pk):
+    student = get_object_or_404(Student, pk=pk)
+    if request.method == 'POST':
+        form = StudentForm(request.POST, instance=student)
+        if form.is_valid():
+            form.save()
+            return redirect('student_list')
+    else:
+        form = StudentForm(instance=student)
+    return render(request, 'student_form.html', {'form': form})
+
+def student_delete(request, pk):
+    student = get_object_or_404(Student, pk=pk)
+    if request.method == 'POST':
+        student.delete()
+        return redirect('student_list')
+    return render(request, 'student_confirm_delete.html', {'student': student})
+
+
+//Urls.py
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('', views.student_list, name='student_list'),
+    path('register/', views.student_register, name='student_register'),
+    path('update/<int:pk>/', views.student_update, name='student_update'),
+    path('delete/<int:pk>/', views.student_delete, name='student_delete'),
+]
+
+
+
+//studentList.html
+<h1>Student Registration Portal</h1>
+<a href="{% url 'student_register' %}">Register New Student</a>
+<table border="1">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Age</th>
+            <th>Course</th>
+            <th>Registration Date</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for student in students %}
+        <tr>
+            <td>{{ student.name }}</td>
+            <td>{{ student.email }}</td>
+            <td>{{ student.age }}</td>
+            <td>{{ student.course }}</td>
+            <td>{{ student.registration_date }}</td>
+            <td>
+                <a href="{% url 'student_update' student.pk %}">Edit</a>
+                <form action="{% url 'student_delete' student.pk %}" method="post" style="display:inline;">
+                    {% csrf_token %}
+                    <button type="submit">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+//student_delete.html
+<h1>Delete Student</h1>
+<p>Are you sure you want to delete "{{ student.name }}"?</p>
+<form method="post">
+    {% csrf_token %}
+    <button type="submit">Yes, Delete</button>
+</form>
+<a href="{% url 'student_list' %}">Cancel</a>
+
+//edit student
+<h1>{% if form.instance.pk %}Edit Student{% else %}Register Student{% endif %}</h1>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Save</button>
+</form>
+<a href="{% url 'student_list' %}">Cancel</a>
